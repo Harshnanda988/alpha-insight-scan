@@ -68,6 +68,8 @@ function ScannerBuilder() {
   const [generating, setGenerating] = useState(false);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Coin[] | null>(null);
+  const publishResults = useResultsStore((s) => s.setResults);
+  const navigate = useNavigate();
 
   const generate = async () => {
     if (!prompt.trim()) return;
@@ -86,7 +88,13 @@ function ScannerBuilder() {
     try {
       const r = await scannerService.run(conditions);
       setResults(r);
-      toast.success(`Scan complete · ${r.length} matches`);
+      publishResults(r, conditions, name || "Untitled Scanner");
+      toast.success(`Scan complete · ${r.length} matches`, {
+        action: {
+          label: "View Results",
+          onClick: () => navigate({ to: "/results" }),
+        },
+      });
     } finally {
       setRunning(false);
     }
