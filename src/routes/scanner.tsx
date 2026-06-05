@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Play, Save, RotateCcw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { ArrowRight, Plus, Play, Save, RotateCcw, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useScannerStore, type Field, type Operator } from "@/store/scanner";
+import { useResultsStore } from "@/store/results";
 import { scannerService } from "@/services/scanner.service";
 import { ChangePill } from "@/components/shared/ChangePill";
 import { formatCompact, formatPrice, type Coin } from "@/mock/coins";
