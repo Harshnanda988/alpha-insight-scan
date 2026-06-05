@@ -21,12 +21,7 @@ import {
 const items = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Scanner Builder", url: "/scanner", icon: SlidersHorizontal },
-  { title: "Saved Scanners", url: "/saved", icon: BookmarkCheck },
   { title: "Scan Results", url: "/results", icon: ListChecks },
-  { title: "Alerts", url: "/alerts", icon: BellRing },
-  { title: "Backtesting", url: "/backtesting", icon: LineChart },
-  { title: "Watchlists", url: "/watchlists", icon: Eye },
-  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
