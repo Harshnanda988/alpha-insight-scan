@@ -89,8 +89,32 @@ function ResultsPage() {
     <div>
       <PageHeader
         title="Scan Results"
-        description="Latest matches across all your active scanners."
+        description={
+          hasScan
+            ? `Showing matches from your latest scan${ranAt ? ` · ${new Date(ranAt).toLocaleTimeString()}` : ""}.`
+            : "Latest matches across all your active scanners."
+        }
       />
+
+      {hasScan && (
+        <Card className="mb-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardContent className="flex flex-wrap items-center gap-3 p-3">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{scannerName}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {conditions
+                  .map((c, i) => `${i > 0 ? `${c.logic} ` : ""}${c.field} ${c.operator} ${c.value}`)
+                  .join(" ") || "No conditions"}
+              </div>
+            </div>
+            <Badge variant="secondary">{scanResults!.length} matches</Badge>
+            <Button variant="ghost" size="sm" onClick={clear}>
+              <X className="mr-1 h-3.5 w-3.5" /> Clear scan
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-4">
