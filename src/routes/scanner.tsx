@@ -240,10 +240,13 @@ function ScannerBuilder() {
 
       {results && (
         <Card className="mt-4">
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">
               Results <span className="text-muted-foreground">· {results.length} matches</span>
             </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/results" })}>
+              Open in Scan Results <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
           <CardContent className="px-0">
             {results.length === 0 ? (
