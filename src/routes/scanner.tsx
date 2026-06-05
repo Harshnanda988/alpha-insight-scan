@@ -163,112 +163,176 @@ function ScannerBuilder() {
       </Card>
 
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-3">
+        <CardHeader className="flex flex-row items-center justify-between gap-3 pb-3">
           <CardTitle className="text-base">Conditions</CardTitle>
-          <Input
-            placeholder="Scanner name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="max-w-xs"
-          />
+          <div className="flex flex-col items-end gap-1">
+            <Input
+              placeholder="Scanner name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={60}
+              aria-invalid={nameError ? true : undefined}
+              className={cn(
+                "max-w-xs",
+                nameError && "border-destructive focus-visible:ring-destructive/50",
+              )}
+            />
+            {nameError && (
+              <span className="text-xs text-destructive">{nameError}</span>
+            )}
+          </div>
         </CardHeader>
         <CardContent className="space-y-2">
-          {conditions.map((c, i) => (
-            <div
-              key={c.id}
-              className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-muted/30 p-2.5"
-            >
-              {i > 0 ? (
-                <Select
-                  value={c.logic}
-                  onValueChange={(v) =>
-                    updateCondition(c.id, { logic: v as "AND" | "OR" })
-                  }
+          <TooltipProvider delayDuration={150}>
+            {conditions.map((c, i) => {
+              const err = errors[c.id];
+              return (
+                <div
+                  key={c.id}
+                  className={cn(
+                    "flex flex-wrap items-center gap-2 rounded-lg border bg-muted/30 p-2.5",
+                    err ? "border-destructive/60" : "border-border",
+                  )}
                 >
-                  <SelectTrigger className="w-20">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AND">AND</SelectItem>
-                    <SelectItem value="OR">OR</SelectItem>
-                  </SelectContent>
-                </Select>
-              ) : (
-                <Badge variant="outline" className="w-20 justify-center">
-                  WHERE
-                </Badge>
-              )}
-              <Select
-                value={c.field}
-                onValueChange={(v) => updateCondition(c.id, { field: v as Field })}
-              >
-                <SelectTrigger className="w-40">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {FIELDS.map((f) => (
-                    <SelectItem key={f} value={f}>
-                      {f}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={c.operator}
-                onValueChange={(v) =>
-                  updateCondition(c.id, { operator: v as Operator })
-                }
-              >
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {OPERATORS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                value={c.value}
-                onChange={(e) => updateCondition(c.id, { value: e.target.value })}
-                className="w-32 tabular-nums"
-              />
-              <Button
-                variant="ghost"
-                size="icon"
-                className="ml-auto text-muted-foreground hover:text-destructive"
-                onClick={() => removeCondition(c.id)}
-                disabled={conditions.length === 1}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
+                  {i > 0 ? (
+                    <Select
+                      value={c.logic}
+                      onValueChange={(v) =>
+                        updateCondition(c.id, { logic: v as "AND" | "OR" })
+                      }
+                    >
+                      <SelectTrigger className="w-20">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="AND">AND</SelectItem>
+                        <SelectItem value="OR">OR</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Badge variant="outline" className="w-20 justify-center">
+                      WHERE
+                    </Badge>
+                  )}
+                  <Select
+                    value={c.field}
+                    onValueChange={(v) => updateCondition(c.id, { field: v as Field })}
+                  >
+                    <SelectTrigger className="w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FIELDS.map((f) => (
+                        <SelectItem key={f} value={f}>
+                          {f}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={c.operator}
+                    onValueChange={(v) =>
+                      updateCondition(c.id, { operator: v as Operator })
+                    }
+                  >
+                    <SelectTrigger className="w-44">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {OPERATORS.map((o) => (
+                        <SelectItem key={o.value} value={o.value}>
+                          {o.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Tooltip open={err ? undefined : false}>
+                    <TooltipTrigger asChild>
+                      <div className="relative">
+                        <Input
+                          inputMode="decimal"
+                          value={c.value}
+                          onChange={(e) =>
+                            updateCondition(c.id, { value: e.target.value })
+                          }
+                          aria-invalid={err ? true : undefined}
+                          className={cn(
+                            "w-32 tabular-nums",
+                            err &&
+                              "border-destructive pr-8 focus-visible:ring-destructive/50",
+                          )}
+                        />
+                        {err && (
+                          <AlertCircle className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-destructive" />
+                        )}
+                      </div>
+                    </TooltipTrigger>
+                    {err && (
+                      <TooltipContent side="top" className="bg-destructive text-destructive-foreground">
+                        {err}
+                      </TooltipContent>
+                    )}
+                  </Tooltip>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="ml-auto text-muted-foreground hover:text-destructive"
+                    onClick={() => removeCondition(c.id)}
+                    disabled={conditions.length === 1}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+          </TooltipProvider>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
             <Button variant="outline" onClick={addCondition}>
               <Plus className="mr-2 h-4 w-4" /> Add Condition
             </Button>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {errorCount > 0 && (
+                <span className="inline-flex items-center gap-1 text-xs text-destructive">
+                  <AlertCircle className="h-3.5 w-3.5" />
+                  {errorCount} invalid condition{errorCount > 1 ? "s" : ""}
+                </span>
+              )}
               <Button variant="ghost" onClick={reset}>
                 <RotateCcw className="mr-2 h-4 w-4" /> Reset
               </Button>
-              <Button
-                variant="outline"
-                onClick={() => toast.success(`Scanner "${name || "Untitled"}" saved`)}
-              >
-                <Save className="mr-2 h-4 w-4" /> Save Scanner
-              </Button>
-              <Button onClick={run} disabled={running}>
-                <Play className="mr-2 h-4 w-4" />
-                {running ? "Running…" : "Run Scanner"}
-              </Button>
+              <TooltipProvider delayDuration={150}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button variant="outline" onClick={save} disabled={hasErrors || !!nameError}>
+                        <Save className="mr-2 h-4 w-4" /> Save Scanner
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {(hasErrors || nameError) && (
+                    <TooltipContent>Fix validation errors to save</TooltipContent>
+                  )}
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button onClick={run} disabled={running || hasErrors}>
+                        <Play className="mr-2 h-4 w-4" />
+                        {running ? "Running…" : "Run Scanner"}
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  {hasErrors && (
+                    <TooltipContent>Fix validation errors to run</TooltipContent>
+                  )}
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </CardContent>
       </Card>
+
 
       {results && (
         <Card className="mt-4">
