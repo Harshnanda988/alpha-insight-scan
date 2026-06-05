@@ -79,6 +79,14 @@ function ScannerBuilder() {
   const publishResults = useResultsStore((s) => s.setResults);
   const navigate = useNavigate();
 
+  const errors = useMemo(() => validateConditions(conditions), [conditions]);
+  const nameError = useMemo(() => {
+    const r = scannerNameSchema.safeParse(name);
+    return r.success ? null : r.error.issues[0]?.message ?? "Invalid name";
+  }, [name]);
+  const errorCount = Object.keys(errors).length;
+  const hasErrors = errorCount > 0 || conditions.length === 0;
+
   const generate = async () => {
     if (!prompt.trim()) return;
     setGenerating(true);
@@ -92,6 +100,10 @@ function ScannerBuilder() {
   };
 
   const run = async () => {
+    if (hasErrors) {
+      toast.error("Fix the highlighted conditions before running");
+      return;
+    }
     setRunning(true);
     try {
       const r = await scannerService.run(conditions);
@@ -106,6 +118,18 @@ function ScannerBuilder() {
     } finally {
       setRunning(false);
     }
+  };
+
+  const save = () => {
+    if (hasErrors) {
+      toast.error("Fix the highlighted conditions before saving");
+      return;
+    }
+    if (nameError) {
+      toast.error(nameError);
+      return;
+    }
+    toast.success(`Scanner "${name || "Untitled"}" saved`);
   };
 
   return (
