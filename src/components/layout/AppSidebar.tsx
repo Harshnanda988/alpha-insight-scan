@@ -2,12 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   LayoutDashboard,
   SlidersHorizontal,
-  BookmarkCheck,
   ListChecks,
-  BellRing,
-  LineChart,
-  Eye,
-  Settings,
   Activity,
 } from "lucide-react";
 import {
