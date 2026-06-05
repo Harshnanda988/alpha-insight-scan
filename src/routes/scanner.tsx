@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { Plus, Play, Save, RotateCcw, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { ArrowRight, Plus, Play, Save, RotateCcw, Sparkles, Trash2, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { useScannerStore, type Field, type Operator } from "@/store/scanner";
+import { useResultsStore } from "@/store/results";
 import { scannerService } from "@/services/scanner.service";
 import { ChangePill } from "@/components/shared/ChangePill";
 import { formatCompact, formatPrice, type Coin } from "@/mock/coins";
@@ -67,6 +68,8 @@ function ScannerBuilder() {
   const [generating, setGenerating] = useState(false);
   const [running, setRunning] = useState(false);
   const [results, setResults] = useState<Coin[] | null>(null);
+  const publishResults = useResultsStore((s) => s.setResults);
+  const navigate = useNavigate();
 
   const generate = async () => {
     if (!prompt.trim()) return;
@@ -85,7 +88,13 @@ function ScannerBuilder() {
     try {
       const r = await scannerService.run(conditions);
       setResults(r);
-      toast.success(`Scan complete · ${r.length} matches`);
+      publishResults(r, conditions, name || "Untitled Scanner");
+      toast.success(`Scan complete · ${r.length} matches`, {
+        action: {
+          label: "View Results",
+          onClick: () => navigate({ to: "/results" }),
+        },
+      });
     } finally {
       setRunning(false);
     }
@@ -231,10 +240,13 @@ function ScannerBuilder() {
 
       {results && (
         <Card className="mt-4">
-          <CardHeader className="pb-2">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="text-base">
               Results <span className="text-muted-foreground">· {results.length} matches</span>
             </CardTitle>
+            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/results" })}>
+              Open in Scan Results <ArrowRight className="ml-1 h-3.5 w-3.5" />
+            </Button>
           </CardHeader>
           <CardContent className="px-0">
             {results.length === 0 ? (

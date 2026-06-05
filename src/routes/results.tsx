@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, Search, X, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { ChangePill } from "@/components/shared/ChangePill";
 import { marketService } from "@/services/market.service";
 import { formatCompact, formatPrice, type Coin } from "@/mock/coins";
+import { useResultsStore } from "@/store/results";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/results")({
@@ -38,10 +39,17 @@ type SortKey = keyof Pick<Coin, "price" | "change24h" | "change7d" | "rsi" | "vo
 const PAGE = 10;
 
 function ResultsPage() {
-  const { data = [], isLoading } = useQuery({
+  const { results: scanResults, scannerName, conditions, ranAt, clear } = useResultsStore();
+  const hasScan = scanResults !== null;
+
+  const { data: market = [], isLoading } = useQuery({
     queryKey: ["market"],
     queryFn: () => marketService.getAll(),
+    enabled: !hasScan,
   });
+
+  const data = hasScan ? scanResults! : market;
+
   const [q, setQ] = useState("");
   const [exchange, setExchange] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("marketCap");
@@ -81,8 +89,32 @@ function ResultsPage() {
     <div>
       <PageHeader
         title="Scan Results"
-        description="Latest matches across all your active scanners."
+        description={
+          hasScan
+            ? `Showing matches from your latest scan${ranAt ? ` · ${new Date(ranAt).toLocaleTimeString()}` : ""}.`
+            : "Latest matches across all your active scanners."
+        }
       />
+
+      {hasScan && (
+        <Card className="mb-4 border-primary/30 bg-gradient-to-br from-primary/5 to-transparent">
+          <CardContent className="flex flex-wrap items-center gap-3 p-3">
+            <Sparkles className="h-4 w-4 text-primary" />
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-sm font-medium">{scannerName}</div>
+              <div className="truncate text-xs text-muted-foreground">
+                {conditions
+                  .map((c, i) => `${i > 0 ? `${c.logic} ` : ""}${c.field} ${c.operator} ${c.value}`)
+                  .join(" ") || "No conditions"}
+              </div>
+            </div>
+            <Badge variant="secondary">{scanResults!.length} matches</Badge>
+            <Button variant="ghost" size="sm" onClick={clear}>
+              <X className="mr-1 h-3.5 w-3.5" /> Clear scan
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardContent className="p-4">
