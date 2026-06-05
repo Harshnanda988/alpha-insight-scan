@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import {
   Activity,
@@ -22,7 +22,13 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { ChangePill } from "@/components/shared/ChangePill";
 import { marketService } from "@/services/market.service";
 import { formatCompact, formatPrice } from "@/mock/coins";
-import { RECENT_ACTIVITY } from "@/mock/scanners";
+
+const RECENT_ACTIVITY: { name: string; matches: number; time: string }[] = [
+  { name: "Golden Cross Hunter", matches: 7, time: "12m ago" },
+  { name: "RSI Oversold Largecaps", matches: 3, time: "2h ago" },
+  { name: "Volume Spike Detector", matches: 12, time: "Yesterday" },
+  { name: "Mean Reversion Setup", matches: 5, time: "5h ago" },
+];
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -110,11 +116,8 @@ function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">Recent Scanner Activity</CardTitle>
-            <Link to="/saved" className="text-xs text-primary hover:underline">
-              View all
-            </Link>
           </CardHeader>
           <CardContent className="space-y-3">
             {RECENT_ACTIVITY.map((a) => (
