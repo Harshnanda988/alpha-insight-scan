@@ -1,29 +1,177 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import {
+  Activity,
+  BellRing,
+  Coins,
+  SlidersHorizontal,
+  TrendingDown,
+  TrendingUp,
+} from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/shared/PageHeader";
+import { ChangePill } from "@/components/shared/ChangePill";
+import { marketService } from "@/services/market.service";
+import { formatCompact, formatPrice } from "@/mock/coins";
+import { RECENT_ACTIVITY } from "@/mock/scanners";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+      { title: "Dashboard · AlphaX" },
+      { name: "description", content: "Live crypto market overview & scanner activity." },
     ],
   }),
-  component: Index,
+  component: Dashboard,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+const STATS = [
+  { label: "Total Coins Scanned", value: "2,148", icon: Coins, accent: "text-primary" },
+  { label: "Active Scanners", value: "12", icon: SlidersHorizontal, accent: "text-primary" },
+  { label: "Active Alerts", value: "8", icon: BellRing, accent: "text-warning" },
+  { label: "Matches Today", value: "47", icon: Activity, accent: "text-success" },
+];
+
+function Dashboard() {
+  const { data: market = [] } = useQuery({
+    queryKey: ["market"],
+    queryFn: () => marketService.getAll(),
+  });
+  const gainers = [...market].sort((a, b) => b.change24h - a.change24h).slice(0, 5);
+  const losers = [...market].sort((a, b) => a.change24h - b.change24h).slice(0, 5);
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
+    <div>
+      <PageHeader
+        title="Dashboard"
+        description="Live market signals and scanner activity at a glance."
       />
+
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {STATS.map((s) => (
+          <Card key={s.label}>
+            <CardContent className="flex items-center justify-between p-4">
+              <div>
+                <div className="text-xs text-muted-foreground">{s.label}</div>
+                <div className="mt-1 text-2xl font-semibold tabular-nums">{s.value}</div>
+              </div>
+              <s.icon className={`h-5 w-5 ${s.accent}`} />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-3">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingUp className="h-4 w-4 text-success" /> Top Gainers (24h)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {gainers.map((c) => (
+              <div key={c.symbol} className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">{c.symbol}</div>
+                  <div className="text-xs text-muted-foreground">{c.name}</div>
+                </div>
+                <ChangePill value={c.change24h} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <TrendingDown className="h-4 w-4 text-destructive" /> Top Losers (24h)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {losers.map((c) => (
+              <div key={c.symbol} className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">{c.symbol}</div>
+                  <div className="text-xs text-muted-foreground">{c.name}</div>
+                </div>
+                <ChangePill value={c.change24h} />
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+            <CardTitle className="text-base">Recent Scanner Activity</CardTitle>
+            <Link to="/saved" className="text-xs text-primary hover:underline">
+              View all
+            </Link>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {RECENT_ACTIVITY.map((a) => (
+              <div key={a.name} className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-medium">{a.name}</div>
+                  <div className="text-xs text-muted-foreground">{a.time}</div>
+                </div>
+                <Badge variant="secondary">{a.matches} matches</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="mt-6">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Market Overview</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Coin</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">24H %</TableHead>
+                  <TableHead className="text-right">Volume</TableHead>
+                  <TableHead className="text-right">Market Cap</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {market.slice(0, 12).map((c) => (
+                  <TableRow key={c.symbol}>
+                    <TableCell>
+                      <div className="font-medium">{c.symbol}</div>
+                      <div className="text-xs text-muted-foreground">{c.name}</div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      ${formatPrice(c.price)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <ChangePill value={c.change24h} />
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      ${formatCompact(c.volume)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums text-muted-foreground">
+                      ${formatCompact(c.marketCap)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
