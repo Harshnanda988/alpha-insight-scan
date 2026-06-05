@@ -116,11 +116,8 @@ function Dashboard() {
         </Card>
 
         <Card>
-          <CardHeader className="pb-2 flex flex-row items-center justify-between">
+          <CardHeader className="pb-2">
             <CardTitle className="text-base">Recent Scanner Activity</CardTitle>
-            <Link to="/saved" className="text-xs text-primary hover:underline">
-              View all
-            </Link>
           </CardHeader>
           <CardContent className="space-y-3">
             {RECENT_ACTIVITY.map((a) => (
