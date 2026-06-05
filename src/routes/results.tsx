@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ArrowUpDown, Search } from "lucide-react";
+import { ArrowUpDown, Search, X, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { ChangePill } from "@/components/shared/ChangePill";
 import { marketService } from "@/services/market.service";
 import { formatCompact, formatPrice, type Coin } from "@/mock/coins";
+import { useResultsStore } from "@/store/results";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/results")({
@@ -38,10 +39,17 @@ type SortKey = keyof Pick<Coin, "price" | "change24h" | "change7d" | "rsi" | "vo
 const PAGE = 10;
 
 function ResultsPage() {
-  const { data = [], isLoading } = useQuery({
+  const { results: scanResults, scannerName, conditions, ranAt, clear } = useResultsStore();
+  const hasScan = scanResults !== null;
+
+  const { data: market = [], isLoading } = useQuery({
     queryKey: ["market"],
     queryFn: () => marketService.getAll(),
+    enabled: !hasScan,
   });
+
+  const data = hasScan ? scanResults! : market;
+
   const [q, setQ] = useState("");
   const [exchange, setExchange] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("marketCap");
