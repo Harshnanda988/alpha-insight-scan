@@ -29,7 +29,8 @@ export function calculateRSI(prices: number[], period: number = 14): number {
 
   if (avgLoss === 0) return 100;
   const rs = avgGain / avgLoss;
-  return 100 - 100 / (1 + rs);
+  const rsi = 100 - 100 / (1 + rs);
+  return parseFloat(rsi.toFixed(2));
 }
 
 /**
@@ -45,5 +46,5 @@ export function calculateEMA(prices: number[], period: number): number {
     ema = prices[i] * k + ema * (1 - k);
   }
 
-  return ema;
+  return parseFloat(ema.toFixed(2));
 }

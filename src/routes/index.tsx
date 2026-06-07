@@ -22,6 +22,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { ChangePill } from "@/components/shared/ChangePill";
 import { marketService } from "@/services/market.service";
 import { formatCompact, formatPrice } from "@/mock/coins";
+import { cn } from "@/lib/utils";
 
 const RECENT_ACTIVITY: { name: string; matches: number; time: string }[] = [
   { name: "Golden Cross Hunter", matches: 7, time: "12m ago" },
@@ -186,6 +187,19 @@ function Dashboard() {
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       ${formatCompact(c.volume)}
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {c.rsi !== null ? (
+                        <span className={cn(
+                          "text-xs",
+                          c.rsi >= 70 && "text-destructive",
+                          c.rsi <= 30 && "text-success",
+                        )}>
+                          RSI: {c.rsi.toFixed(2)}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-muted-foreground animate-pulse">N/A</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       ${formatCompact(c.marketCap)}

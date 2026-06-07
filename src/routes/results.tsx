@@ -46,6 +46,7 @@ function ResultsPage() {
     queryKey: ["market"],
     queryFn: () => marketService.getAll(),
     enabled: !hasScan,
+    staleTime: 0, // Force fresh data
   });
 
   const data = hasScan ? scanResults! : market;
@@ -194,21 +195,23 @@ function ResultsPage() {
                       <TableCell className="text-right tabular-nums">
                         <span
                           className={cn(
-                            c.rsi >= 70 && "text-destructive",
-                            c.rsi <= 30 && "text-success",
+                            c.rsi && c.rsi >= 70 && "text-destructive",
+                            c.rsi && c.rsi <= 30 && "text-success",
                           )}
                         >
-                          {c.rsi}
+                          {c.rsi !== null ? c.rsi.toFixed(2) : (
+                            <span className="text-muted-foreground animate-pulse text-[10px]">N/A</span>
+                          )}
                         </span>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-right">
                         <Badge
-                          variant="outline"
+                          variant="secondary"
                           className={cn(
-                            c.emaStatus === "Bullish" &&
-                              "border-success/40 text-success",
-                            c.emaStatus === "Bearish" &&
-                              "border-destructive/40 text-destructive",
+                            "text-[10px] font-medium",
+                            c.emaStatus === "Bullish" && "bg-success/10 text-success border-success/20",
+                            c.emaStatus === "Bearish" && "bg-destructive/10 text-destructive border-destructive/20",
+                            c.emaStatus === "N/A" && "bg-muted text-muted-foreground",
                           )}
                         >
                           {c.emaStatus}

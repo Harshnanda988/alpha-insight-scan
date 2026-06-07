@@ -20,6 +20,7 @@ export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
     cmcApiKey: process.env.CMC_API_KEY,
+    cgApiKey: process.env.CG_API_KEY,
     // Add server-only values here, e.g.:
     //   databaseUrl: process.env.DATABASE_URL,
     //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,

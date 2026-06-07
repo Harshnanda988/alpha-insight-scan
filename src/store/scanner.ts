@@ -6,6 +6,8 @@ export type Field =
   | "EMA20"
   | "EMA50"
   | "EMA200"
+  | "SMA50"
+  | "SMA200"
   | "Volume"
   | "Market Cap"
   | "Price Change";

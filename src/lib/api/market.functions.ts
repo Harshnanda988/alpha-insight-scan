@@ -1,95 +1,108 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getServerConfig } from "../config.server";
 import type { Coin } from "@/mock/coins";
-import { calculateRSI, calculateEMA } from "../ta";
+import { indicatorService } from "@/services/indicator.service";
+import { exchangeService } from "@/services/exchange.server";
+import { cmcService } from "@/services/cmc.service";
 
-async function fetchBinanceTechnicals(symbol: string, interval: string = "1d") {
+async function getTechnicals(symbol: string, interval: string = "1d") {
   try {
-    // Map common symbols to Binance pairs
-    const pair = `${symbol}USDT`;
-    const response = await fetch(
-      `https://api.binance.com/api/v3/klines?symbol=${pair}&interval=${interval}&limit=100`
-    );
-    if (!response.ok) return null;
+    const ohlcvResult = await exchangeService.fetchOHLCVWithFallback(symbol, interval);
+    if (!ohlcvResult || !ohlcvResult.data) return null;
+
+    const prices = ohlcvResult.data.map((d: any) => d[4]); // Closing prices
     
-    const data = await response.json();
-    const prices = data.map((d: any) => parseFloat(d[4])); // Closing prices
-    
-    const rsi = calculateRSI(prices);
-    const ema20 = calculateEMA(prices, 20);
-    const ema50 = calculateEMA(prices, 50);
-    const ema200 = calculateEMA(prices, 200);
+    const rsi = indicatorService.calculateRSI(prices);
+    const ema20 = indicatorService.calculateEMA(prices, 20);
+    const ema50 = indicatorService.calculateEMA(prices, 50);
+    const ema200 = indicatorService.calculateEMA(prices, 200);
+    const sma50 = indicatorService.calculateSMA(prices, 50);
+    const sma200 = indicatorService.calculateSMA(prices, 200);
     
     const currentPrice = prices[prices.length - 1];
     let emaStatus: "Bullish" | "Bearish" | "Neutral" = "Neutral";
-    if (currentPrice > ema50) emaStatus = "Bullish";
-    if (currentPrice < ema50) emaStatus = "Bearish";
+    if (ema50 && currentPrice > ema50) emaStatus = "Bullish";
+    if (ema50 && currentPrice < ema50) emaStatus = "Bearish";
 
-    return { rsi, ema20, ema50, ema200, emaStatus };
+    return { 
+      rsi, 
+      ema20, 
+      ema50, 
+      ema200, 
+      sma50,
+      sma200,
+      emaStatus,
+      exchange: ohlcvResult.exchange,
+      pair: ohlcvResult.pair
+    };
   } catch (e) {
     return null;
   }
 }
 
-export const fetchMarketData = createServerFn({ method: "GET" })
-  .validator((d: any) => d as { timeframes?: string[] } | undefined)
+export const fetchMarketData = createServerFn({ method: "POST" })
+  .validator((d: any) => d as { timeframes?: string[]; symbols?: string[] } | undefined)
   .handler(async ({ data: inputData }) => {
-    const config = getServerConfig();
-    const apiKey = config.cmcApiKey;
     const requestedTimeframes = inputData?.timeframes || ["1d"];
+    const targetSymbols = inputData?.symbols;
 
-    console.log("Fetching market data from CMC...", apiKey ? "API Key found" : "API Key MISSING", "Timeframes:", requestedTimeframes);
-
-    if (!apiKey) {
-      console.error("CMC_API_KEY is not configured");
-      return [];
-    }
+    console.log(`[MarketData] Fetching data for ${targetSymbols?.length || "all"} coins, TF: ${requestedTimeframes}`);
 
     try {
-      const response = await fetch(
-        "https://pro-api.coinmarketcap.com/v1/cryptocurrency/listings/latest?limit=100&convert=USD",
-        {
-          headers: {
-            "X-CMC_PRO_API_KEY": apiKey,
-            "Accept": "application/json",
-          },
-        }
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        console.error("CMC API Error:", error);
-        return [];
+      // Step 0: Warm up exchange markets (Parallel)
+      if (targetSymbols && targetSymbols.length > 0) {
+        console.log(`[MarketData] Warming up exchanges for ${targetSymbols.length} symbols...`);
+        const EXCHANGES_PRIORITY = ["binance", "bybit", "bitget", "okx", "mexc"];
+        await Promise.all(EXCHANGES_PRIORITY.map(id => exchangeService.ensureMarketsLoaded(id)));
       }
 
-      const data = await response.json();
+      // Step 1: Discover coins via CoinMarketCap
+      const topCoins = await cmcService.getTopCoins(1000);
       
-      // Fetch technicals for top 20 coins to keep it snappy, for each requested timeframe
-      const topCoins = data.data.slice(0, 20);
       const technicalsMap = new Map();
       
-      for (const tf of requestedTimeframes) {
-        await Promise.all(
-          topCoins.map(async (item: any) => {
-            const tech = await fetchBinanceTechnicals(item.symbol, tf);
-            if (tech) {
-              const key = `${item.symbol}_${tf}`;
-              technicalsMap.set(key, tech);
-            }
-          })
-        );
+      // Step 2: On-demand technicals via CCXT Fallback
+      if (targetSymbols && targetSymbols.length > 0) {
+        console.log(`[MarketData] Fetching technicals for ${targetSymbols.length} candidate coins...`);
+        const chunkSize = 25; // Increased chunk size for better parallelism
+        for (const tf of requestedTimeframes) {
+          for (let i = 0; i < targetSymbols.length; i += chunkSize) {
+            const chunk = targetSymbols.slice(i, i + chunkSize);
+            
+            if (i > 0) await new Promise(r => setTimeout(r, 50)); // Further reduced delay
+
+            await Promise.all(
+              chunk.map(async (symbol: string) => {
+                try {
+                  const techPromise = getTechnicals(symbol, tf);
+                  const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error("Timeout")), 10000) // Increased timeout to 10s
+                  );
+                  
+                  const tech = await Promise.race([techPromise, timeoutPromise]) as any;
+                  if (tech) {
+                    technicalsMap.set(`${symbol}_${tf}`, tech);
+                  }
+                } catch (e) {
+                  // Silent fail for individual coins
+                }
+              })
+            );
+          }
+        }
+        console.log(`[MarketData] Finished fetching technicals. Found data for ${technicalsMap.size} combinations.`);
       }
       
-      const coins: Coin[] = data.data.map((item: any) => {
-        const quote = item.quote.USD;
-        
-        // Default technicals from the first requested timeframe or 1d
+      // Map back to Coin objects
+      // If targetSymbols is provided, we only return those symbols to save bandwidth
+      const filteredTopCoins = targetSymbols && targetSymbols.length > 0
+        ? topCoins.filter(item => targetSymbols.includes(item.symbol))
+        : topCoins;
+
+      const coins: Coin[] = filteredTopCoins.map((item: any) => {
         const defaultTf = requestedTimeframes[0] || "1d";
         const techDefault = technicalsMap.get(`${item.symbol}_${defaultTf}`);
         
-        const change24h = quote.percent_change_24h;
-        
-        // We add a map of technicals per timeframe to the coin object
         const technicalsByTimeframe: Record<string, any> = {};
         for (const tf of requestedTimeframes) {
           const tech = technicalsMap.get(`${item.symbol}_${tf}`);
@@ -99,27 +112,25 @@ export const fetchMarketData = createServerFn({ method: "GET" })
         return {
           symbol: item.symbol,
           name: item.name,
-          price: quote.price,
-          change24h: quote.percent_change_24h,
-          change7d: quote.percent_change_7d,
-          volume: quote.volume_24h,
-          marketCap: quote.market_cap,
-          rsi: techDefault?.rsi ?? Math.round(30 + Math.random() * 40),
-          emaStatus: techDefault?.emaStatus ?? (change24h > 2 ? "Bullish" : change24h < -2 ? "Bearish" : "Neutral"),
+          price: item.price,
+          change24h: item.change24h,
+          change7d: item.change7d,
+          volume: item.volume,
+          marketCap: item.marketCap,
+          rsi: techDefault?.rsi ?? null,
+          emaStatus: techDefault?.emaStatus ?? "N/A",
           pattern: "Consolidation", 
-          exchange: "Multi",
-          // Extended fields
-          ema20: techDefault?.ema20,
-          ema50: techDefault?.ema50,
-          ema200: techDefault?.ema200,
-          // All technicals
+          exchange: techDefault?.exchange ?? "Multi",
+          ema20: techDefault?.ema20 ?? null,
+          ema50: techDefault?.ema50 ?? null,
+          ema200: techDefault?.ema200 ?? null,
           technicals: technicalsByTimeframe,
         };
       });
 
       return coins;
     } catch (error) {
-      console.error("Error fetching market data:", error);
+      console.error("Error in fetchMarketData:", error);
       return [];
     }
   });

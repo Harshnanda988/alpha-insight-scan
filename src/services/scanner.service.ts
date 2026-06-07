@@ -5,42 +5,76 @@ import { marketService } from "./market.service";
 export const scannerService = {
   async run(conditions: Condition[]): Promise<Coin[]> {
     const timeframes = Array.from(new Set(conditions.map((c) => c.timeframe)));
-    const coins = await marketService.getAll(timeframes);
     
-    return coins.filter((c) => {
-      // AND logic: all conditions must match
-      // OR logic: at least one condition must match
-      // For simplicity in this UI, we treat all as AND if they are AND, or check sequential logic
-      
+    // Step 1: Get all coins with market cap > $10M (Fast, no technicals yet)
+    const baseCoins = await marketService.getAll(timeframes);
+    
+    // Step 2: Filter by non-technical fields first to reduce the workload
+    // This makes the scan incredibly fast
+    const candidateCoins = baseCoins.filter(c => {
+      return conditions.every(cond => {
+        if (["Volume", "Market Cap", "Price Change"].includes(cond.field)) {
+          const value = parseFloat(cond.value);
+          const fieldMap: Record<string, number> = {
+            Volume: c.volume,
+            "Market Cap": c.marketCap,
+            "Price Change": c.change24h,
+          };
+          const fv = fieldMap[cond.field] ?? 0;
+          switch (cond.operator) {
+            case "<": return fv < value;
+            case ">": return fv > value;
+            case "<=": return fv <= value;
+            case ">=": return fv >= value;
+            case "=": return Math.abs(fv - value) < 0.0001;
+            default: return true;
+          }
+        }
+        return true;
+      });
+    });
+
+    // Step 3: Fetch technicals ONLY for candidates (On-Demand)
+    // We limit this to the top 500 candidates to ensure stability while providing broad coverage
+    const finalCandidates = candidateCoins.slice(0, 500);
+    const symbols = finalCandidates.map(c => c.symbol);
+    
+    // If no symbols passed the market cap/volume/price filters, we can stop here
+    if (symbols.length === 0) return [];
+
+    const coinsWithTech = await marketService.getAll(timeframes, symbols);
+    
+    // Step 4: Final filter with technicals
+    return coinsWithTech.filter((c) => {
       let matches = true;
       
       for (let i = 0; i < conditions.length; i++) {
         const cond = conditions[i];
         const value = parseFloat(cond.value);
         
-        // Get field value for the specific timeframe
         const tech = c.technicals?.[cond.timeframe] || {};
-        const fieldMap: Record<string, number> = {
-          RSI: tech.rsi ?? c.rsi,
-          EMA20: tech.ema20 ?? c.ema20 ?? c.price,
-          EMA50: tech.ema50 ?? c.ema50 ?? c.price,
-          EMA200: tech.ema200 ?? c.ema200 ?? c.price,
-          Volume: c.volume,
-          "Market Cap": c.marketCap,
-          "Price Change": c.change24h,
-        };
         
-        const fv = fieldMap[cond.field] ?? 0;
+        // Check if the field exists in technicals or the coin itself
+        const isTechnicalField = ["RSI", "EMA20", "EMA50", "EMA200", "SMA50", "SMA200"].includes(cond.field);
+        const fv = isTechnicalField 
+          ? (tech[cond.field.toLowerCase()] ?? null)
+          : (cond.field === "Volume" ? c.volume : cond.field === "Market Cap" ? c.marketCap : c.change24h);
+        
+        // If it's a technical field and value is null, it can't match any comparison
         let condMatch = false;
-        
-        switch (cond.operator) {
-          case "<": condMatch = fv < value; break;
-          case ">": condMatch = fv > value; break;
-          case "<=": condMatch = fv <= value; break;
-          case ">=": condMatch = fv >= value; break;
-          case "=": condMatch = Math.abs(fv - value) < 0.0001; break;
-          case "crosses_above": condMatch = fv > value && c.change24h > 0; break;
-          case "crosses_below": condMatch = fv < value && c.change24h < 0; break;
+        if (isTechnicalField && fv === null) {
+          condMatch = false;
+        } else {
+          const numFv = fv as number;
+          switch (cond.operator) {
+            case "<": condMatch = numFv < value; break;
+            case ">": condMatch = numFv > value; break;
+            case "<=": condMatch = numFv <= value; break;
+            case ">=": condMatch = numFv >= value; break;
+            case "=": condMatch = Math.abs(numFv - value) < 0.0001; break;
+            case "crosses_above": condMatch = numFv > value && c.change24h > 0; break;
+            case "crosses_below": condMatch = numFv < value && c.change24h < 0; break;
+          }
         }
 
         if (i === 0) {

@@ -6,13 +6,13 @@ export interface Coin {
   change7d: number;
   volume: number;
   marketCap: number;
-  rsi: number;
-  emaStatus: "Bullish" | "Bearish" | "Neutral";
+  rsi: number | null;
+  emaStatus: "Bullish" | "Bearish" | "Neutral" | "N/A";
   pattern: string;
   exchange: string;
-  ema20?: number;
-  ema50?: number;
-  ema200?: number;
+  ema20?: number | null;
+  ema50?: number | null;
+  ema200?: number | null;
   technicals?: Record<string, any>;
 }
 

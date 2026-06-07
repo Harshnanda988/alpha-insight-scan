@@ -114,8 +114,14 @@ function ScannerBuilder() {
       return;
     }
     setRunning(true);
+    setResults(null); // Clear old results
     try {
       const r = await scannerService.run(conditions);
+      if (!r || r.length === 0) {
+        toast.info("No coins matched your conditions");
+        setResults([]);
+        return;
+      }
       setResults(r);
       publishResults(r, conditions, name || "Untitled Scanner");
       toast.success(`Scan complete · ${r.length} matches`, {
@@ -124,6 +130,9 @@ function ScannerBuilder() {
           onClick: () => navigate({ to: "/results" }),
         },
       });
+    } catch (error) {
+      console.error("Scanner Error:", error);
+      toast.error("Failed to run scanner. Please try again.");
     } finally {
       setRunning(false);
     }
@@ -401,7 +410,18 @@ function ScannerBuilder() {
                         <TableCell className="text-right">
                           <ChangePill value={c.change24h} />
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">{c.rsi}</TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {c.rsi !== null ? (
+                            <span className={cn(
+                              c.rsi >= 70 && "text-destructive",
+                              c.rsi <= 30 && "text-success",
+                            )}>
+                              {c.rsi.toFixed(2)}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-muted-foreground animate-pulse">N/A</span>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           ${formatCompact(c.volume)}
                         </TableCell>

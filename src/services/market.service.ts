@@ -2,9 +2,9 @@ import { type Coin } from "@/mock/coins";
 import { fetchMarketData } from "@/lib/api/market.functions";
 
 export const marketService = {
-  async getAll(timeframes?: string[]): Promise<Coin[]> {
+  async getAll(timeframes?: string[], symbols?: string[]): Promise<Coin[]> {
     try {
-      const coins = await fetchMarketData({ data: { timeframes } });
+      const coins = await fetchMarketData({ data: { timeframes, symbols } });
       return coins;
     } catch (error) {
       console.error("Failed to fetch market data:", error);
