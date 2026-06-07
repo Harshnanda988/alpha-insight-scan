@@ -10,12 +10,15 @@ export type Field =
   | "Market Cap"
   | "Price Change";
 
+export type Timeframe = "1h" | "4h" | "1d" | "1w" | "1M";
+
 export interface Condition {
   id: string;
   field: Field;
   operator: Operator;
   value: string;
   logic: "AND" | "OR";
+  timeframe: Timeframe;
 }
 
 interface ScannerState {
@@ -35,6 +38,7 @@ const newCond = (): Condition => ({
   operator: ">",
   value: "60",
   logic: "AND",
+  timeframe: "1d",
 });
 
 export const useScannerStore = create<ScannerState>((set) => ({

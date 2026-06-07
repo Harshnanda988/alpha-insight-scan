@@ -21,7 +21,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { useScannerStore, type Field, type Operator } from "@/store/scanner";
+import { useScannerStore, type Field, type Operator, type Timeframe } from "@/store/scanner";
 import { useResultsStore } from "@/store/results";
 import { scannerService } from "@/services/scanner.service";
 import { ChangePill } from "@/components/shared/ChangePill";
@@ -36,11 +36,20 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Clock } from "lucide-react";
 
 export const Route = createFileRoute("/scanner")({
   head: () => ({ meta: [{ title: "Scanner Builder · AlphaX" }] }),
   component: ScannerBuilder,
 });
+
+const TIMEFRAMES: { value: Timeframe; label: string }[] = [
+  { value: "1h", label: "Hourly (1h)" },
+  { value: "4h", label: "4-Hour (4h)" },
+  { value: "1d", label: "Daily (1d)" },
+  { value: "1w", label: "Weekly (1w)" },
+  { value: "1M", label: "Monthly (1M)" },
+];
 
 const FIELDS: Field[] = [
   "RSI",
@@ -214,6 +223,24 @@ function ScannerBuilder() {
                       WHERE
                     </Badge>
                   )}
+                  <Select
+                    value={c.timeframe}
+                    onValueChange={(v) =>
+                      updateCondition(c.id, { timeframe: v as Timeframe })
+                    }
+                  >
+                    <SelectTrigger className="w-32">
+                      <Clock className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {TIMEFRAMES.map((t) => (
+                        <SelectItem key={t.value} value={t.value}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Select
                     value={c.field}
                     onValueChange={(v) => updateCondition(c.id, { field: v as Field })}

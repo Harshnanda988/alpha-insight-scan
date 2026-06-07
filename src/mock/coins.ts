@@ -10,6 +10,10 @@ export interface Coin {
   emaStatus: "Bullish" | "Bearish" | "Neutral";
   pattern: string;
   exchange: string;
+  ema20?: number;
+  ema50?: number;
+  ema200?: number;
+  technicals?: Record<string, any>;
 }
 
 const PATTERNS = [

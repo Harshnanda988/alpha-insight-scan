@@ -40,18 +40,40 @@ export const Route = createFileRoute("/")({
   component: Dashboard,
 });
 
-const STATS = [
-  { label: "Total Coins Scanned", value: "2,148", icon: Coins, accent: "text-primary" },
-  { label: "Active Scanners", value: "12", icon: SlidersHorizontal, accent: "text-primary" },
-  { label: "Active Alerts", value: "8", icon: BellRing, accent: "text-warning" },
-  { label: "Matches Today", value: "47", icon: Activity, accent: "text-success" },
-];
-
 function Dashboard() {
   const { data: market = [] } = useQuery({
     queryKey: ["market"],
     queryFn: () => marketService.getAll(),
+    refetchInterval: 30000, // Refresh every 30 seconds for live feel
   });
+
+  const stats = [
+    { 
+      label: "Total Coins Scanned", 
+      value: market.length > 0 ? market.length.toLocaleString() : "2,148", 
+      icon: Coins, 
+      accent: "text-primary" 
+    },
+    { 
+      label: "Bullish Trend (EMA)", 
+      value: market.filter(c => c.emaStatus === "Bullish").length.toString(), 
+      icon: TrendingUp, 
+      accent: "text-success" 
+    },
+    { 
+      label: "Oversold (RSI < 30)", 
+      value: market.filter(c => c.rsi < 30).length.toString(), 
+      icon: Activity, 
+      accent: "text-warning" 
+    },
+    { 
+      label: "High Volatility", 
+      value: market.filter(c => Math.abs(c.change24h) > 5).length.toString(), 
+      icon: SlidersHorizontal, 
+      accent: "text-primary" 
+    },
+  ];
+
   const gainers = [...market].sort((a, b) => b.change24h - a.change24h).slice(0, 5);
   const losers = [...market].sort((a, b) => a.change24h - b.change24h).slice(0, 5);
 
@@ -63,7 +85,7 @@ function Dashboard() {
       />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {STATS.map((s) => (
+        {stats.map((s) => (
           <Card key={s.label}>
             <CardContent className="flex items-center justify-between p-4">
               <div>
