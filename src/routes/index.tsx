@@ -63,7 +63,7 @@ function Dashboard() {
     },
     { 
       label: "Oversold (RSI < 30)", 
-      value: market.filter(c => c.rsi < 30).length.toString(), 
+      value: market.filter(c => c.rsi !== null && c.rsi < 30).length.toString(), 
       icon: Activity, 
       accent: "text-warning" 
     },

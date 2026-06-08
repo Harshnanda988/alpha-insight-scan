@@ -8,6 +8,8 @@ const FIELD_RULES: Record<Field, { min: number; max: number; int?: boolean; hint
   EMA50: { min: 0, max: 10_000_000, hint: "EMA50 must be a positive number" },
   EMA200: { min: 0, max: 10_000_000, hint: "EMA200 must be a positive number" },
   Volume: { min: 0, max: 1_000_000_000_000, hint: "Volume must be ≥ 0" },
+  SMA50: { min: 0, max: 10_000_000, hint: "SMA50 must be a positive number" },
+  SMA200: { min: 0, max: 10_000_000, hint: "SMA200 must be a positive number" },
   "Market Cap": { min: 0, max: 10_000_000_000_000, hint: "Market Cap must be ≥ 0" },
   "Price Change": { min: -100, max: 1000, hint: "Price Change must be between -100 and 1000 (%)" },
 };

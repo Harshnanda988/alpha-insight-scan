@@ -17,12 +17,18 @@ import process from "node:process";
 //     VITE_ prefix. Never put secrets here — they ship to the browser.
 
 export function getServerConfig() {
-  return {
+  const config = {
     nodeEnv: process.env.NODE_ENV,
     cmcApiKey: process.env.CMC_API_KEY,
     cgApiKey: process.env.CG_API_KEY,
-    // Add server-only values here, e.g.:
-    //   databaseUrl: process.env.DATABASE_URL,
-    //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   };
+
+  // Only warn in production to avoid blocking dev if keys are missing
+  if (process.env.NODE_ENV === "production") {
+    if (!config.cmcApiKey) {
+      console.error("CRITICAL: CMC_API_KEY is missing in production environment!");
+    }
+  }
+
+  return config;
 }

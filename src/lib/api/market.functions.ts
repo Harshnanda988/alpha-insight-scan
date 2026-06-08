@@ -96,7 +96,7 @@ export const fetchMarketData = createServerFn({ method: "POST" })
       // Map back to Coin objects
       // If targetSymbols is provided, we only return those symbols to save bandwidth
       const filteredTopCoins = targetSymbols && targetSymbols.length > 0
-        ? topCoins.filter(item => targetSymbols.includes(item.symbol))
+        ? topCoins.filter((item: any) => targetSymbols.includes(item.symbol))
         : topCoins;
 
       const coins: Coin[] = filteredTopCoins.map((item: any) => {

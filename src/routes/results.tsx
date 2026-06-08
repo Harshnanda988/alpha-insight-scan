@@ -64,7 +64,11 @@ function ResultsPage() {
         c.name.toLowerCase().includes(q.toLowerCase()),
     );
     if (exchange !== "all") r = r.filter((c) => c.exchange === exchange);
-    r = [...r].sort((a, b) => (asc ? a[sortKey] - b[sortKey] : b[sortKey] - a[sortKey]));
+    r = [...r].sort((a, b) => {
+      const va = a[sortKey] ?? 0;
+      const vb = b[sortKey] ?? 0;
+      return asc ? (va as number) - (vb as number) : (vb as number) - (va as number);
+    });
     return r;
   }, [data, q, exchange, sortKey, asc]);
 
