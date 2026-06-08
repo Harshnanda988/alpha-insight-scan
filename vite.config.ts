@@ -9,6 +9,9 @@ import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 export default defineConfig({
   nitro: {
     preset: "vercel",
+    externals: {
+      inline: ["tslib", "react-remove-scroll", "react-remove-scroll-bar", "react-style-singleton"],
+    },
   },
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
@@ -16,6 +19,11 @@ export default defineConfig({
     server: { entry: "server" },
   },
   vite: {
+    resolve: {
+      alias: {
+        tslib: "tslib",
+      },
+    },
     optimizeDeps: {
       exclude: ["ccxt"],
     },
@@ -35,6 +43,9 @@ export default defineConfig({
       },
     },
     ssr: {
+      noExternal: [
+        /^(?!ccxt|protobufjs|http-proxy-agent|https-proxy-agent|socks-proxy-agent|proxy-from-env).*/,
+      ],
       external: [
         "ccxt",
         "protobufjs",
