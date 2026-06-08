@@ -13,25 +13,26 @@ export const cmcService = {
    * CMC free tier allows up to 5000 per request, but we'll fetch 1000 to be safe and fast.
    */
   async getTopCoins(limit: number = 1000, minMarketCap: number = 10000000) {
+    console.log(`[cmcService] getTopCoins START - limit: ${limit}, minMC: ${minMarketCap}`);
     const config = getServerConfig();
     const apiKey = config.cmcApiKey;
 
     if (!apiKey) {
-      console.error("CMC_API_KEY is not configured");
+      console.error("[cmcService] FAILURE - CMC_API_KEY is not configured");
       return [];
     }
 
     try {
       // Fetch up to 1000 coins in one go
-      const response = await fetch(
-        `${BASE_URL}/cryptocurrency/listings/latest?limit=${limit}&convert=USD&market_cap_min=${minMarketCap}&sort=market_cap&sort_dir=desc`,
-        {
-          headers: {
-            "X-CMC_PRO_API_KEY": apiKey,
-            "Accept": "application/json",
-          },
-        }
-      );
+      const url = `${BASE_URL}/cryptocurrency/listings/latest?limit=${limit}&convert=USD&market_cap_min=${minMarketCap}&sort=market_cap&sort_dir=desc`;
+      console.log(`[cmcService] Fetching from: ${url}`);
+      
+      const response = await fetch(url, {
+        headers: {
+          "X-CMC_PRO_API_KEY": apiKey,
+          "Accept": "application/json",
+        },
+      });
 
       if (!response.ok) {
         let errorDetails = "";
@@ -41,13 +42,17 @@ export const cmcService = {
         } catch (e) {
           errorDetails = response.statusText;
         }
-        throw new Error(`CMC API error (${response.status}): ${errorDetails}`);
+        console.error(`[cmcService] FAILURE - CMC API error (${response.status}): ${errorDetails}`);
+        return [];
       }
 
       const data = await response.json();
       if (!data || !data.data) {
-        throw new Error("Invalid response structure from CMC");
+        console.error("[cmcService] FAILURE - Invalid response structure from CMC");
+        return [];
       }
+      
+      console.log(`[cmcService] SUCCESS - Fetched ${data.data.length} coins`);
       
       return data.data.map((coin: any) => ({
         id: coin.id.toString(),
@@ -61,7 +66,7 @@ export const cmcService = {
         image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png`,
       }));
     } catch (error) {
-      console.error("CMC Fetch Error:", error);
+      console.error("[cmcService] FAILURE - Unexpected Error:", error);
       return [];
     }
   }

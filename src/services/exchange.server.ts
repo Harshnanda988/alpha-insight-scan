@@ -13,16 +13,24 @@ const instances: Record<string, any> = {};
 const marketsLoaded: Record<string, boolean> = {};
 
 function getExchangeInstance(id: string) {
-  if (!instances[id]) {
-    const ExchangeClass = (ccxt as any)[id];
-    if (ExchangeClass) {
-      instances[id] = new ExchangeClass({
-        timeout: 10000,
-        enableRateLimit: true,
-      });
+  try {
+    if (!instances[id]) {
+      console.log(`[exchangeService] Initializing exchange instance: ${id}`);
+      const ExchangeClass = (ccxt as any)[id];
+      if (ExchangeClass) {
+        instances[id] = new ExchangeClass({
+          timeout: 10000,
+          enableRateLimit: true,
+        });
+      } else {
+        console.warn(`[exchangeService] Exchange class not found for: ${id}`);
+      }
     }
+    return instances[id];
+  } catch (e) {
+    console.error(`[exchangeService] Critical error initializing exchange ${id}:`, e);
+    return null;
   }
-  return instances[id];
 }
 
 export const exchangeService = {
@@ -30,15 +38,20 @@ export const exchangeService = {
    * Ensure markets are loaded for an exchange
    */
   async ensureMarketsLoaded(exchangeId: string) {
+    console.log(`[exchangeService] ensureMarketsLoaded START - exchange: ${exchangeId}`);
     const exchange = getExchangeInstance(exchangeId);
-    if (!exchange) return false;
+    if (!exchange) {
+      console.error(`[exchangeService] FAILURE - Could not get instance for ${exchangeId}`);
+      return false;
+    }
 
     if (!marketsLoaded[exchangeId]) {
       try {
         await exchange.loadMarkets();
         marketsLoaded[exchangeId] = true;
+        console.log(`[exchangeService] SUCCESS - Markets loaded for ${exchangeId}`);
       } catch (error) {
-        console.error(`Error loading markets for ${exchangeId}:`, (error as any).message);
+        console.error(`[exchangeService] FAILURE - Error loading markets for ${exchangeId}:`, (error as any).message);
         return false;
       }
     }
@@ -49,6 +62,7 @@ export const exchangeService = {
    * Attempt to find an exchange that supports the given symbol and fetch OHLCV data.
    */
   async fetchOHLCVWithFallback(symbol: string, timeframe: string = "1d", limit: number = 500) {
+    console.log(`[exchangeService] fetchOHLCVWithFallback START - symbol: ${symbol}, tf: ${timeframe}`);
     const normalizedSymbol = symbol.toUpperCase();
     const trySymbols = [
       `${normalizedSymbol}/USDT`,
@@ -67,8 +81,9 @@ export const exchangeService = {
 
         for (const pair of trySymbols) {
           if (exchange.markets[pair]) {
-            // console.log(`Found ${pair} on ${exchangeId}`);
+            console.log(`[exchangeService] Found ${pair} on ${exchangeId}. Fetching OHLCV...`);
             const ohlcv = await exchange.fetchOHLCV(pair, timeframe, undefined, limit);
+            console.log(`[exchangeService] SUCCESS - Fetched OHLCV from ${exchangeId}`);
             return {
               exchange: exchangeId,
               pair,
@@ -77,11 +92,12 @@ export const exchangeService = {
           }
         }
       } catch (error) {
-        // console.error(`Error fetching from ${exchangeId}:`, (error as any).message);
+        console.warn(`[exchangeService] Error fetching from ${exchangeId}:`, (error as any).message);
         continue;
       }
     }
 
+    console.warn(`[exchangeService] FAILURE - No exchange found for ${symbol}`);
     return null;
   },
 

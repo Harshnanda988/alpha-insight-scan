@@ -38,6 +38,13 @@ export const Route = createFileRoute("/")({
       { name: "description", content: "Live crypto market overview & scanner activity." },
     ],
   }),
+  loader: async ({ context }) => {
+    // Prefetch market data on the server for SSR stability
+    await context.queryClient.ensureQueryData({
+      queryKey: ["market"],
+      queryFn: () => marketService.getAll(),
+    });
+  },
   component: Dashboard,
 });
 
@@ -48,35 +55,38 @@ function Dashboard() {
     refetchInterval: 30000, // Refresh every 30 seconds for live feel
   });
 
+  // Ensure market is an array before processing
+  const safeMarket = Array.isArray(market) ? market : [];
+
   const stats = [
     { 
       label: "Total Coins Scanned", 
-      value: market.length > 0 ? market.length.toLocaleString() : "2,148", 
+      value: safeMarket.length > 0 ? safeMarket.length.toLocaleString() : "0", 
       icon: Coins, 
       accent: "text-primary" 
     },
     { 
       label: "Bullish Trend (EMA)", 
-      value: market.filter(c => c.emaStatus === "Bullish").length.toString(), 
+      value: safeMarket.filter(c => c.emaStatus === "Bullish").length.toString(), 
       icon: TrendingUp, 
       accent: "text-success" 
     },
     { 
       label: "Oversold (RSI < 30)", 
-      value: market.filter(c => c.rsi !== null && c.rsi < 30).length.toString(), 
+      value: safeMarket.filter(c => c.rsi !== null && c.rsi < 30).length.toString(), 
       icon: Activity, 
       accent: "text-warning" 
     },
     { 
       label: "High Volatility", 
-      value: market.filter(c => Math.abs(c.change24h) > 5).length.toString(), 
+      value: safeMarket.filter(c => Math.abs(c.change24h) > 5).length.toString(), 
       icon: SlidersHorizontal, 
       accent: "text-primary" 
     },
   ];
 
-  const gainers = [...market].sort((a, b) => b.change24h - a.change24h).slice(0, 5);
-  const losers = [...market].sort((a, b) => a.change24h - b.change24h).slice(0, 5);
+  const gainers = [...safeMarket].sort((a, b) => b.change24h - a.change24h).slice(0, 5);
+  const losers = [...safeMarket].sort((a, b) => a.change24h - b.change24h).slice(0, 5);
 
   return (
     <div>

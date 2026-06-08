@@ -1,14 +1,18 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getServerConfig } from "../config.server";
-import type { Coin } from "@/mock/coins";
+import { type Coin } from "@/mock/coins";
 import { indicatorService } from "@/services/indicator.service";
-import { exchangeService } from "@/services/exchange.server";
-import { cmcService } from "@/services/cmc.service";
 
 async function getTechnicals(symbol: string, interval: string = "1d") {
+  console.log(`[getTechnicals] START - symbol: ${symbol}, tf: ${interval}`);
   try {
+    // Dynamic import to ensure server-only code stays on the server
+    const { exchangeService } = await import("@/services/exchange.server");
+    
     const ohlcvResult = await exchangeService.fetchOHLCVWithFallback(symbol, interval);
-    if (!ohlcvResult || !ohlcvResult.data) return null;
+    if (!ohlcvResult || !ohlcvResult.data) {
+      console.warn(`[getTechnicals] FAILURE - No OHLCV data for ${symbol}`);
+      return null;
+    }
 
     const prices = ohlcvResult.data.map((d: any) => d[4]); // Closing prices
     
@@ -24,6 +28,7 @@ async function getTechnicals(symbol: string, interval: string = "1d") {
     if (ema50 && currentPrice > ema50) emaStatus = "Bullish";
     if (ema50 && currentPrice < ema50) emaStatus = "Bearish";
 
+    console.log(`[getTechnicals] SUCCESS - symbol: ${symbol}`);
     return { 
       rsi, 
       ema20, 
@@ -36,6 +41,7 @@ async function getTechnicals(symbol: string, interval: string = "1d") {
       pair: ohlcvResult.pair
     };
   } catch (e) {
+    console.error(`[getTechnicals] FAILURE - Unexpected Error for ${symbol}:`, e);
     return null;
   }
 }
@@ -46,24 +52,37 @@ export const fetchMarketData = createServerFn({ method: "POST" })
     const requestedTimeframes = inputData?.timeframes || ["1d"];
     const targetSymbols = inputData?.symbols;
 
-    console.log(`[MarketData] Fetching data for ${targetSymbols?.length || "all"} coins, TF: ${requestedTimeframes}`);
+    console.log(`[fetchMarketData] START - Fetching data for ${targetSymbols?.length || "all"} coins, TF: ${requestedTimeframes}`);
 
     try {
+      // Dynamic imports for server-only services
+      const { cmcService } = await import("@/services/cmc.service");
+      const { exchangeService } = await import("@/services/exchange.server");
+
       // Step 0: Warm up exchange markets (Parallel)
       if (targetSymbols && targetSymbols.length > 0) {
-        console.log(`[MarketData] Warming up exchanges for ${targetSymbols.length} symbols...`);
+        console.log(`[fetchMarketData] Warming up exchanges for ${targetSymbols.length} symbols...`);
         const EXCHANGES_PRIORITY = ["binance", "bybit", "bitget", "okx", "mexc"];
-        await Promise.all(EXCHANGES_PRIORITY.map(id => exchangeService.ensureMarketsLoaded(id)));
+        try {
+          await Promise.all(EXCHANGES_PRIORITY.map(id => exchangeService.ensureMarketsLoaded(id)));
+          console.log(`[fetchMarketData] Exchanges warmed up`);
+        } catch (e) {
+          console.warn(`[fetchMarketData] Exchange warmup partial failure:`, e);
+        }
       }
 
       // Step 1: Discover coins via CoinMarketCap
       const topCoins = await cmcService.getTopCoins(1000);
+      if (!topCoins || topCoins.length === 0) {
+        console.warn(`[fetchMarketData] No coins discovered via CMC`);
+        return [];
+      }
       
       const technicalsMap = new Map();
       
       // Step 2: On-demand technicals via CCXT Fallback
       if (targetSymbols && targetSymbols.length > 0) {
-        console.log(`[MarketData] Fetching technicals for ${targetSymbols.length} candidate coins...`);
+        console.log(`[fetchMarketData] Fetching technicals for ${targetSymbols.length} candidate coins...`);
         const chunkSize = 25; // Increased chunk size for better parallelism
         for (const tf of requestedTimeframes) {
           for (let i = 0; i < targetSymbols.length; i += chunkSize) {
@@ -85,12 +104,13 @@ export const fetchMarketData = createServerFn({ method: "POST" })
                   }
                 } catch (e) {
                   // Silent fail for individual coins
+                  console.warn(`[fetchMarketData] Failed to fetch technicals for ${symbol}:`, e);
                 }
               })
             );
           }
         }
-        console.log(`[MarketData] Finished fetching technicals. Found data for ${technicalsMap.size} combinations.`);
+        console.log(`[fetchMarketData] Finished fetching technicals. Found data for ${technicalsMap.size} combinations.`);
       }
       
       // Map back to Coin objects
@@ -128,9 +148,10 @@ export const fetchMarketData = createServerFn({ method: "POST" })
         };
       });
 
+      console.log(`[fetchMarketData] SUCCESS - Returning ${coins.length} coins`);
       return coins;
     } catch (error) {
-      console.error("Error in fetchMarketData:", error);
+      console.error("[fetchMarketData] FAILURE - Unexpected Error:", error);
       return [];
     }
   });

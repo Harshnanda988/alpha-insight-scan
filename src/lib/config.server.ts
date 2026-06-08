@@ -17,16 +17,22 @@ import process from "node:process";
 //     VITE_ prefix. Never put secrets here — they ship to the browser.
 
 export function getServerConfig() {
+  console.log("[getServerConfig] Loading environment variables...");
   const config = {
     nodeEnv: process.env.NODE_ENV,
     cmcApiKey: process.env.CMC_API_KEY,
     cgApiKey: process.env.CG_API_KEY,
   };
 
+  // Log status (without exposing full keys)
+  console.log(`[getServerConfig] NODE_ENV: ${config.nodeEnv}`);
+  console.log(`[getServerConfig] CMC_API_KEY: ${config.cmcApiKey ? "PRESENT (masked)" : "MISSING"}`);
+  console.log(`[getServerConfig] CG_API_KEY: ${config.cgApiKey ? "PRESENT (masked)" : "MISSING"}`);
+
   // Only warn in production to avoid blocking dev if keys are missing
   if (process.env.NODE_ENV === "production") {
     if (!config.cmcApiKey) {
-      console.error("CRITICAL: CMC_API_KEY is missing in production environment!");
+      console.error("[getServerConfig] CRITICAL: CMC_API_KEY is missing in production environment!");
     }
   }
 
