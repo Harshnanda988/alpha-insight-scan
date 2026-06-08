@@ -39,23 +39,31 @@ export const exchangeService = {
    */
   async ensureMarketsLoaded(exchangeId: string) {
     console.log(`[exchangeService] ensureMarketsLoaded START - exchange: ${exchangeId}`);
-    const exchange = getExchangeInstance(exchangeId);
-    if (!exchange) {
-      console.error(`[exchangeService] FAILURE - Could not get instance for ${exchangeId}`);
-      return false;
-    }
-
-    if (!marketsLoaded[exchangeId]) {
-      try {
-        await exchange.loadMarkets();
-        marketsLoaded[exchangeId] = true;
-        console.log(`[exchangeService] SUCCESS - Markets loaded for ${exchangeId}`);
-      } catch (error) {
-        console.error(`[exchangeService] FAILURE - Error loading markets for ${exchangeId}:`, (error as any).message);
+    try {
+      const exchange = getExchangeInstance(exchangeId);
+      if (!exchange) {
+        console.error(`[exchangeService] FAILURE - Could not get instance for ${exchangeId}`);
         return false;
       }
+
+      if (!marketsLoaded[exchangeId]) {
+        try {
+          await exchange.loadMarkets();
+          marketsLoaded[exchangeId] = true;
+          console.log(`[exchangeService] SUCCESS - Markets loaded for ${exchangeId}`);
+        } catch (error: any) {
+          console.error(`[exchangeService] FAILURE - Error loading markets for ${exchangeId}:`, error.message);
+          if (error instanceof Error) {
+            console.error(`[exchangeService] Stack Trace for ${exchangeId}:`, error.stack);
+          }
+          return false;
+        }
+      }
+      return true;
+    } catch (error: any) {
+      console.error(`[exchangeService] Unexpected error in ensureMarketsLoaded for ${exchangeId}:`, error);
+      return false;
     }
-    return true;
   },
 
   /**

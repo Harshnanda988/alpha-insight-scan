@@ -150,8 +150,11 @@ export const fetchMarketData = createServerFn({ method: "POST" })
 
       console.log(`[fetchMarketData] SUCCESS - Returning ${coins.length} coins`);
       return coins;
-    } catch (error) {
+    } catch (error: any) {
       console.error("[fetchMarketData] FAILURE - Unexpected Error:", error);
+      if (error instanceof Error) {
+        console.error("[fetchMarketData] Stack Trace:", error.stack);
+      }
       return [];
     }
   });

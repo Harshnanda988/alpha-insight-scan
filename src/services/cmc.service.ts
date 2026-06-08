@@ -46,9 +46,9 @@ export const cmcService = {
         return [];
       }
 
-      const data = await response.json();
+      const data: any = await response.json();
       if (!data || !data.data) {
-        console.error("[cmcService] FAILURE - Invalid response structure from CMC");
+        console.error("[cmcService] FAILURE - Invalid response structure from CMC", data);
         return [];
       }
       
@@ -58,15 +58,18 @@ export const cmcService = {
         id: coin.id.toString(),
         symbol: coin.symbol.toUpperCase(),
         name: coin.name,
-        price: coin.quote.USD.price,
-        marketCap: coin.quote.USD.market_cap,
-        volume: coin.quote.USD.volume_24h,
-        change24h: coin.quote.USD.percent_change_24h,
-        change7d: coin.quote.USD.percent_change_7d,
+        price: coin.quote?.USD?.price || 0,
+        marketCap: coin.quote?.USD?.market_cap || 0,
+        volume: coin.quote?.USD?.volume_24h || 0,
+        change24h: coin.quote?.USD?.percent_change_24h || 0,
+        change7d: coin.quote?.USD?.percent_change_7d || 0,
         image: `https://s2.coinmarketcap.com/static/img/coins/64x64/${coin.id}.png`,
       }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("[cmcService] FAILURE - Unexpected Error:", error);
+      if (error instanceof Error) {
+        console.error("[cmcService] Stack Trace:", error.stack);
+      }
       return [];
     }
   }
