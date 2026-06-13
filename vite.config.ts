@@ -10,7 +10,7 @@ export default defineConfig({
   nitro: {
     preset: "vercel",
     externals: {
-      inline: ["tslib", "react-remove-scroll", "react-remove-scroll-bar", "react-style-singleton"],
+      inline: ["ccxt", "tslib", "react-remove-scroll", "react-remove-scroll-bar", "react-style-singleton"],
     },
   },
   tanstackStart: {
@@ -24,16 +24,12 @@ export default defineConfig({
         tslib: "tslib",
       },
     },
-    optimizeDeps: {
-      exclude: ["ccxt"],
-    },
     build: {
       commonjsOptions: {
         transformMixedEsModules: true,
       },
       rollupOptions: {
         external: [
-          "ccxt",
           "protobufjs",
           "http-proxy-agent",
           "https-proxy-agent",
@@ -43,11 +39,8 @@ export default defineConfig({
       },
     },
     ssr: {
-      noExternal: [
-        /^(?!ccxt|protobufjs|http-proxy-agent|https-proxy-agent|socks-proxy-agent|proxy-from-env).*/,
-      ],
+      noExternal: ["ccxt"],
       external: [
-        "ccxt",
         "protobufjs",
         "http-proxy-agent",
         "https-proxy-agent",
