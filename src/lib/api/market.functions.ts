@@ -5,8 +5,8 @@ import { indicatorService } from "@/services/indicator.service";
 async function getTechnicals(symbol: string, interval: string = "1d") {
   console.log(`[getTechnicals] START - symbol: ${symbol}, tf: ${interval}`);
   try {
-    // Dynamic import to ensure server-only code stays on the server
-    const { exchangeService } = await import("@/services/exchange.server");
+    // Dynamic import using relative path for Vercel server function compatibility
+    const { exchangeService } = await import("../../services/exchange.server.js");
     
     const ohlcvResult = await exchangeService.fetchOHLCVWithFallback(symbol, interval);
     if (!ohlcvResult || !ohlcvResult.data) {
@@ -55,9 +55,9 @@ export const fetchMarketData = createServerFn({ method: "POST" })
     console.log(`[fetchMarketData] START - Fetching data for ${targetSymbols?.length || "all"} coins, TF: ${requestedTimeframes}`);
 
     try {
-      // Dynamic imports for server-only services
-      const { cmcService } = await import("@/services/cmc.service");
-      const { exchangeService } = await import("@/services/exchange.server");
+      // Dynamic imports using relative paths for Vercel server function compatibility
+      const { cmcService } = await import("../../services/cmc.service.js");
+      const { exchangeService } = await import("../../services/exchange.server.js");
 
       // Step 0: Warm up exchange markets (Parallel)
       if (targetSymbols && targetSymbols.length > 0) {
