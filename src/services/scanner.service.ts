@@ -1,19 +1,21 @@
 import { type Coin } from "@/mock/coins";
 import type { Condition } from "@/store/scanner";
-import { marketService } from "./market.service";
+import { fetchMarketData } from "@/lib/api/market.functions";
 
 export const scannerService = {
   async run(conditions: Condition[]): Promise<Coin[]> {
     const timeframes = Array.from(new Set(conditions.map((c) => c.timeframe)));
     
     // Step 1: Get all coins with market cap > $10M (Fast, no technicals yet)
-    const baseCoins = await marketService.getAll(timeframes);
+    const baseCoins = await fetchMarketData({ data: { timeframes } } as any);
     
     // Step 2: Filter by non-technical fields first to reduce the workload
     // This makes the scan incredibly fast
     const candidateCoins = baseCoins.filter(c => {
       return conditions.every(cond => {
         if (["Volume", "Market Cap", "Price Change"].includes(cond.field)) {
+          const comparisonType = cond.comparisonType || "value";
+          if (comparisonType !== "value") return true;
           const value = parseFloat(cond.value);
           const fieldMap: Record<string, number> = {
             Volume: c.volume,
@@ -34,7 +36,7 @@ export const scannerService = {
       });
     });
 
-    // Step 3: Fetch technicals ONLY for candidates (On-Demand)
+    // Step 3: Fetch technicals ONLY for candidates (On-demand)
     // We limit this to the top 500 candidates to ensure stability while providing broad coverage
     const finalCandidates = candidateCoins.slice(0, 500);
     const symbols = finalCandidates.map(c => c.symbol);
@@ -42,7 +44,7 @@ export const scannerService = {
     // If no symbols passed the market cap/volume/price filters, we can stop here
     if (symbols.length === 0) return [];
 
-    const coinsWithTech = await marketService.getAll(timeframes, symbols);
+    const coinsWithTech = await fetchMarketData({ data: { timeframes, symbols, conditions } } as any);
     
     // Step 4: Final filter with technicals
     return coinsWithTech.filter((c) => {
@@ -50,30 +52,55 @@ export const scannerService = {
       
       for (let i = 0; i < conditions.length; i++) {
         const cond = conditions[i];
-        const value = parseFloat(cond.value);
         
         const tech = c.technicals?.[cond.timeframe] || {};
+        const comparisonType = cond.comparisonType || "value";
         
-        // Check if the field exists in technicals or the coin itself
-        const isTechnicalField = ["RSI", "EMA20", "EMA50", "EMA200", "SMA50", "SMA200"].includes(cond.field);
-        const fv = isTechnicalField 
-          ? (tech[cond.field.toLowerCase()] ?? null)
-          : (cond.field === "Volume" ? c.volume : cond.field === "Market Cap" ? c.marketCap : c.change24h);
+        // Get left side value
+        let leftVal: number | null = null;
         
-        // If it's a technical field and value is null, it can't match any comparison
+        if (["Volume", "Market Cap", "Price Change"].includes(cond.field)) {
+          const fieldMap: Record<string, number> = {
+            Volume: c.volume,
+            "Market Cap": c.marketCap,
+            "Price Change": c.change24h,
+          };
+          leftVal = fieldMap[cond.field] ?? null;
+        } else if (cond.field === "RSI") {
+          leftVal = tech.rsi ?? null;
+        } else if (["EMA", "SMA"].includes(cond.field) && cond.indicatorPeriod) {
+          const period = parseInt(cond.indicatorPeriod);
+          if (!isNaN(period)) {
+            const key = `${cond.field.toLowerCase()}${period}`;
+            leftVal = tech[key] ?? null;
+          }
+        }
+        
+        // Get right side value
+        let rightVal: number | null = null;
+        if (comparisonType === "value") {
+          rightVal = parseFloat(cond.value);
+        } else if (comparisonType === "price") {
+          rightVal = tech.currentPrice ?? c.price;
+        } else if (comparisonType === "indicator" && cond.comparisonIndicator && cond.comparisonIndicatorPeriod) {
+          const period = parseInt(cond.comparisonIndicatorPeriod);
+          if (!isNaN(period)) {
+            const key = `${cond.comparisonIndicator.toLowerCase()}${period}`;
+            rightVal = tech[key] ?? null;
+          }
+        }
+        
+        // If either side is null, condition doesn't match
         let condMatch = false;
-        if (isTechnicalField && fv === null) {
-          condMatch = false;
-        } else {
-          const numFv = fv as number;
+        if (leftVal !== null && rightVal !== null) {
           switch (cond.operator) {
-            case "<": condMatch = numFv < value; break;
-            case ">": condMatch = numFv > value; break;
-            case "<=": condMatch = numFv <= value; break;
-            case ">=": condMatch = numFv >= value; break;
-            case "=": condMatch = Math.abs(numFv - value) < 0.0001; break;
-            case "crosses_above": condMatch = numFv > value && c.change24h > 0; break;
-            case "crosses_below": condMatch = numFv < value && c.change24h < 0; break;
+            case "<": condMatch = leftVal < rightVal; break;
+            case ">": condMatch = leftVal > rightVal; break;
+            case "<=": condMatch = leftVal <= rightVal; break;
+            case ">=": condMatch = leftVal >= rightVal; break;
+            case "=": condMatch = Math.abs(leftVal - rightVal) < 0.0001; break;
+            case "crosses_above": condMatch = leftVal > rightVal && c.change24h > 0; break;
+            case "crosses_below": condMatch = leftVal < rightVal && c.change24h < 0; break;
           }
         }
 
@@ -115,6 +142,7 @@ export const scannerService = {
     for (const part of parts) {
       const partTf = getTimeframe(part) || timeframe;
       
+      // Handle RSI
       if (part.includes("rsi")) {
         const m = part.match(/rsi[^\d]*(\d+)/);
         const v = m ? m[1] : "60";
@@ -125,28 +153,60 @@ export const scannerService = {
           value: v,
           logic: out.length > 0 ? "AND" : "AND",
           timeframe: partTf,
+          comparisonType: "value",
         });
       }
-      if (part.includes("ema50") || part.includes("ema 50")) {
+      
+      // Handle EMA (including custom periods like "EMA 15"
+      const emaMatch = part.match(/ema[^\d]*(\d+)/);
+      if (part.includes("ema") && emaMatch) {
+        const period = emaMatch[1];
+        let operator: any = ">";
+        let comparisonType: "value" | "price" | "indicator" = "price";
+        
+        if (part.includes("cross")) {
+          operator = part.includes("cross above") || part.includes("crosses above") ? "crosses_above" : "crosses_below";
+        } else if (part.includes("below") || part.includes("<")) {
+          operator = "<";
+        }
+        
         out.push({
           id: id(),
-          field: "EMA50",
-          operator: part.includes("cross") ? "crosses_above" : (part.includes("below") ? "<" : ">"),
-          value: part.includes("above") || part.includes("below") || part.includes("cross") ? "0" : "50",
-          logic: out.length > 0 ? "AND" : "AND",
-          timeframe: partTf,
-        });
-      }
-      if (part.includes("ema200") || part.includes("ema 200")) {
-        out.push({
-          id: id(),
-          field: "EMA200",
-          operator: part.includes("cross") ? "crosses_above" : (part.includes("below") ? "<" : ">"),
+          field: "EMA",
+          indicatorPeriod: period,
+          operator: operator,
           value: "0",
           logic: out.length > 0 ? "AND" : "AND",
           timeframe: partTf,
+          comparisonType: comparisonType,
         });
       }
+      
+      // Handle SMA (including custom periods)
+      const smaMatch = part.match(/sma[^\d]*(\d+)/);
+      if (part.includes("sma") && smaMatch) {
+        const period = smaMatch[1];
+        let operator: any = ">";
+        let comparisonType: "value" | "price" | "indicator" = "price";
+        
+        if (part.includes("cross")) {
+          operator = part.includes("cross above") || part.includes("crosses above") ? "crosses_above" : "crosses_below";
+        } else if (part.includes("below") || part.includes("<")) {
+          operator = "<";
+        }
+        
+        out.push({
+          id: id(),
+          field: "SMA",
+          indicatorPeriod: period,
+          operator: operator,
+          value: "0",
+          logic: out.length > 0 ? "AND" : "AND",
+          timeframe: partTf,
+          comparisonType: comparisonType,
+        });
+      }
+      
       if (part.includes("volume")) {
         out.push({
           id: id(),
@@ -155,6 +215,7 @@ export const scannerService = {
           value: "100000000",
           logic: out.length > 0 ? "AND" : "AND",
           timeframe: partTf,
+          comparisonType: "value",
         });
       }
       if (part.includes("change") || part.includes("gain") || part.includes("up")) {
@@ -167,12 +228,13 @@ export const scannerService = {
           value: v,
           logic: out.length > 0 ? "AND" : "AND",
           timeframe: partTf,
+          comparisonType: "value",
         });
       }
     }
 
     if (out.length === 0) {
-      out.push({ id: id(), field: "RSI", operator: ">", value: "50", logic: "AND", timeframe: "1d" });
+      out.push({ id: id(), field: "RSI", operator: ">", value: "60", logic: "AND", timeframe: "1d", comparisonType: "value" });
     }
     return out;
   },

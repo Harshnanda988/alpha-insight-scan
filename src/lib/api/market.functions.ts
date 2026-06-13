@@ -1,8 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { type Coin } from "@/mock/coins";
 import { indicatorService } from "@/services/indicator.service";
+import type { Condition } from "@/store/scanner";
 
-async function getTechnicals(symbol: string, interval: string = "1d") {
+async function getTechnicals(symbol: string, interval: string = "1d", conditions?: Condition[]) {
   console.log(`[getTechnicals] START - symbol: ${symbol}, tf: ${interval}`);
   try {
     // Dynamic import using relative path for Vercel server function compatibility
@@ -15,31 +16,65 @@ async function getTechnicals(symbol: string, interval: string = "1d") {
     }
 
     const prices = ohlcvResult.data.map((d: any) => d[4]); // Closing prices
-    
-    const rsi = indicatorService.calculateRSI(prices);
-    const ema20 = indicatorService.calculateEMA(prices, 20);
-    const ema50 = indicatorService.calculateEMA(prices, 50);
-    const ema200 = indicatorService.calculateEMA(prices, 200);
-    const sma50 = indicatorService.calculateSMA(prices, 50);
-    const sma200 = indicatorService.calculateSMA(prices, 200);
-    
     const currentPrice = prices[prices.length - 1];
+
+    // Calculate all required indicators
+    const techData: any = { prices, currentPrice };
+    
+    // Always calculate default indicators for backward compatibility
+    techData.rsi = indicatorService.calculateRSI(prices);
+    techData.ema20 = indicatorService.calculateEMA(prices, 20);
+    techData.ema50 = indicatorService.calculateEMA(prices, 50);
+    techData.ema200 = indicatorService.calculateEMA(prices, 200);
+    techData.sma50 = indicatorService.calculateSMA(prices, 50);
+    techData.sma200 = indicatorService.calculateSMA(prices, 200);
+    
+    // Calculate custom indicators from conditions if provided
+    if (conditions) {
+      const relevantConditions = conditions.filter(c => 
+        ["EMA", "SMA"].includes(c.field) || 
+        (c.comparisonType === "indicator" && ["EMA", "SMA"].includes(c.comparisonIndicator || ""))
+      );
+      
+      for (const cond of relevantConditions) {
+        // Calculate main indicator
+        if (["EMA", "SMA"].includes(cond.field) && cond.indicatorPeriod) {
+          const period = parseInt(cond.indicatorPeriod);
+          if (!isNaN(period)) {
+            const key = `${cond.field.toLowerCase()}${period}`;
+            if (!techData[key]) {
+              techData[key] = cond.field === "EMA" 
+                ? indicatorService.calculateEMA(prices, period)
+                : indicatorService.calculateSMA(prices, period);
+            }
+          }
+        }
+        
+        // Calculate comparison indicator
+        if (cond.comparisonType === "indicator" && cond.comparisonIndicator && cond.comparisonIndicatorPeriod) {
+          const period = parseInt(cond.comparisonIndicatorPeriod);
+          if (!isNaN(period)) {
+            const key = `${cond.comparisonIndicator.toLowerCase()}${period}`;
+            if (!techData[key]) {
+              techData[key] = cond.comparisonIndicator === "EMA"
+                ? indicatorService.calculateEMA(prices, period)
+                : indicatorService.calculateSMA(prices, period);
+            }
+          }
+        }
+      }
+    }
+
+    // Determine EMA status
     let emaStatus: "Bullish" | "Bearish" | "Neutral" = "Neutral";
-    if (ema50 && currentPrice > ema50) emaStatus = "Bullish";
-    if (ema50 && currentPrice < ema50) emaStatus = "Bearish";
+    if (techData.ema50 && currentPrice > techData.ema50) emaStatus = "Bullish";
+    if (techData.ema50 && currentPrice < techData.ema50) emaStatus = "Bearish";
+    techData.emaStatus = emaStatus;
+    techData.exchange = ohlcvResult.exchange;
+    techData.pair = ohlcvResult.pair;
 
     console.log(`[getTechnicals] SUCCESS - symbol: ${symbol}`);
-    return { 
-      rsi, 
-      ema20, 
-      ema50, 
-      ema200, 
-      sma50,
-      sma200,
-      emaStatus,
-      exchange: ohlcvResult.exchange,
-      pair: ohlcvResult.pair
-    };
+    return techData;
   } catch (e) {
     console.error(`[getTechnicals] FAILURE - Unexpected Error for ${symbol}:`, e);
     return null;
@@ -47,10 +82,11 @@ async function getTechnicals(symbol: string, interval: string = "1d") {
 }
 
 export const fetchMarketData = createServerFn({ method: "POST" })
-  .validator((d: any) => d as { timeframes?: string[]; symbols?: string[] } | undefined)
+  .validator((d: any) => d as { timeframes?: string[]; symbols?: string[]; conditions?: Condition[] } | undefined)
   .handler(async ({ data: inputData }) => {
     const requestedTimeframes = inputData?.timeframes || ["1d"];
     const targetSymbols = inputData?.symbols;
+    const conditions = inputData?.conditions;
 
     console.log(`[fetchMarketData] START - Fetching data for ${targetSymbols?.length || "all"} coins, TF: ${requestedTimeframes}`);
 
@@ -93,7 +129,7 @@ export const fetchMarketData = createServerFn({ method: "POST" })
             await Promise.all(
               chunk.map(async (symbol: string) => {
                 try {
-                  const techPromise = getTechnicals(symbol, tf);
+                  const techPromise = getTechnicals(symbol, tf, conditions);
                   const timeoutPromise = new Promise((_, reject) => 
                     setTimeout(() => reject(new Error("Timeout")), 10000) // Increased timeout to 10s
                   );

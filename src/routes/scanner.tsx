@@ -53,13 +53,13 @@ const TIMEFRAMES: { value: Timeframe; label: string }[] = [
 
 const FIELDS: Field[] = [
   "RSI",
-  "EMA20",
-  "EMA50",
-  "EMA200",
+  "EMA",
+  "SMA",
   "Volume",
   "Market Cap",
   "Price Change",
 ];
+
 const OPERATORS: { value: Operator; label: string }[] = [
   { value: "<", label: "<" },
   { value: ">", label: ">" },
@@ -168,7 +168,7 @@ function ScannerBuilder() {
             <Textarea
               value={prompt}
               onChange={(e) => setPrompt(e.target.value)}
-              placeholder='e.g. "Coins above RSI 60", "Coins crossing EMA50", "Coins with volume spike"'
+              placeholder='e.g. "Coins above RSI 60", "Price crossing down EMA 15", "Coins with EMA 10 above EMA 20"'
               rows={2}
               className="flex-1 resize-none"
             />
@@ -204,6 +204,9 @@ function ScannerBuilder() {
           <TooltipProvider delayDuration={150}>
             {conditions.map((c, i) => {
               const err = errors[c.id];
+              const isMovingAverage = ["EMA", "SMA"].includes(c.field);
+              const comparisonType = c.comparisonType || "value";
+              
               return (
                 <div
                   key={c.id}
@@ -252,9 +255,16 @@ function ScannerBuilder() {
                   </Select>
                   <Select
                     value={c.field}
-                    onValueChange={(v) => updateCondition(c.id, { field: v as Field })}
+                    onValueChange={(v) => {
+                      const newField = v as Field;
+                      const isMA = ["EMA", "SMA"].includes(newField);
+                      updateCondition(c.id, { 
+                        field: newField, 
+                        ...(isMA ? { indicatorPeriod: "20", comparisonType: "price" } : { comparisonType: "value" })
+                      });
+                    }}
                   >
-                    <SelectTrigger className="w-40">
+                    <SelectTrigger className="w-24">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -265,6 +275,17 @@ function ScannerBuilder() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {isMovingAverage && (
+                    <Input
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="Period"
+                      value={c.indicatorPeriod || ""}
+                      onChange={(e) => updateCondition(c.id, { indicatorPeriod: e.target.value })}
+                      className="w-20"
+                    />
+                  )}
                   <Select
                     value={c.operator}
                     onValueChange={(v) =>
@@ -282,33 +303,77 @@ function ScannerBuilder() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Tooltip open={err ? undefined : false}>
-                    <TooltipTrigger asChild>
-                      <div className="relative">
-                        <Input
-                          inputMode="decimal"
-                          value={c.value}
-                          onChange={(e) =>
-                            updateCondition(c.id, { value: e.target.value })
-                          }
-                          aria-invalid={err ? true : undefined}
-                          className={cn(
-                            "w-32 tabular-nums",
-                            err &&
-                              "border-destructive pr-8 focus-visible:ring-destructive/50",
+                  {isMovingAverage ? (
+                    <Select
+                      value={comparisonType}
+                      onValueChange={(v) => updateCondition(c.id, { comparisonType: v as any })}
+                    >
+                      <SelectTrigger className="w-28">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="price">Price</SelectItem>
+                        <SelectItem value="value">Value</SelectItem>
+                        <SelectItem value="indicator">Indicator</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : null}
+                  {comparisonType === "value" ? (
+                    <Tooltip open={err ? undefined : false}>
+                      <TooltipTrigger asChild>
+                        <div className="relative">
+                          <Input
+                            inputMode="decimal"
+                            value={c.value}
+                            onChange={(e) =>
+                              updateCondition(c.id, { value: e.target.value })
+                            }
+                            aria-invalid={err ? true : undefined}
+                            className={cn(
+                              "w-32 tabular-nums",
+                              err &&
+                                "border-destructive pr-8 focus-visible:ring-destructive/50",
+                            )}
+                          />
+                          {err && (
+                            <AlertCircle className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-destructive" />
                           )}
-                        />
-                        {err && (
-                          <AlertCircle className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-destructive" />
-                        )}
-                      </div>
-                    </TooltipTrigger>
-                    {err && (
-                      <TooltipContent side="top" className="bg-destructive text-destructive-foreground">
-                        {err}
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
+                        </div>
+                      </TooltipTrigger>
+                      {err && (
+                        <TooltipContent side="top" className="bg-destructive text-destructive-foreground">
+                          {err}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  ) : comparisonType === "indicator" ? (
+                    <>
+                      <Select
+                        value={c.comparisonIndicator || ""}
+                        onValueChange={(v) => updateCondition(c.id, { comparisonIndicator: v as Field })}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {["EMA", "SMA"].map((f) => (
+                            <SelectItem key={f} value={f as Field}>
+                              {f}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        min="1"
+                        step="1"
+                        placeholder="Period"
+                        value={c.comparisonIndicatorPeriod || ""}
+                        onChange={(e) => updateCondition(c.id, { comparisonIndicatorPeriod: e.target.value })}
+                        className="w-20"
+                      />
+                    </>
+                  ) : null}
                   <Button
                     variant="ghost"
                     size="icon"

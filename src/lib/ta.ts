@@ -48,3 +48,13 @@ export function calculateEMA(prices: number[], period: number): number {
 
   return parseFloat(ema.toFixed(2));
 }
+
+/**
+ * Calculate Simple Moving Average (SMA)
+ */
+export function calculateSMA(prices: number[], period: number): number {
+  if (prices.length < period) return prices[prices.length - 1] || 0;
+  
+  const sum = prices.slice(-period).reduce((a, b) => a + b, 0);
+  return parseFloat((sum / period).toFixed(2));
+}

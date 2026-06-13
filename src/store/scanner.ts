@@ -3,11 +3,8 @@ import { create } from "zustand";
 export type Operator = "<" | ">" | "<=" | ">=" | "=" | "crosses_above" | "crosses_below";
 export type Field =
   | "RSI"
-  | "EMA20"
-  | "EMA50"
-  | "EMA200"
-  | "SMA50"
-  | "SMA200"
+  | "EMA"
+  | "SMA"
   | "Volume"
   | "Market Cap"
   | "Price Change";
@@ -21,6 +18,10 @@ export interface Condition {
   value: string;
   logic: "AND" | "OR";
   timeframe: Timeframe;
+  indicatorPeriod?: string; // For EMA/SMA custom periods (e.g., "15")
+  comparisonType?: "value" | "price" | "indicator"; // What to compare against
+  comparisonIndicator?: Field; // If comparisonType is "indicator"
+  comparisonIndicatorPeriod?: string; // If comparisonType is "indicator"
 }
 
 interface ScannerState {
@@ -41,6 +42,7 @@ const newCond = (): Condition => ({
   value: "60",
   logic: "AND",
   timeframe: "1d",
+  comparisonType: "value",
 });
 
 export const useScannerStore = create<ScannerState>((set) => ({
