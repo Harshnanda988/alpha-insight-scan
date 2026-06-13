@@ -72,6 +72,7 @@ export function AppSidebar() {
       <SidebarFooter>
         <div className="px-2 py-1 text-[10px] text-muted-foreground group-data-[collapsible=icon]:hidden">
           v1.0 · Live data sandbox
+          <div>Made with love by ~Harshit ❤️</div>
         </div>
       </SidebarFooter>
     </Sidebar>
